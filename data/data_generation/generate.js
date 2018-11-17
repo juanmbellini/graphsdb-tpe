@@ -148,27 +148,21 @@ _.times(config.users, userid => {
 		const initialVenue = venues[_.random(0, venues.length - 1)];
 		const trajectory = [initialVenue];
 		const visits = _.random(config.visits[0], config.visits[1]);
-		const times = _.chain(visits).times(i => _.random(0, SECONDS_PER_DAY - 1)).sortBy(v => v).value();
-		let skip = 0;
-		_.times(visits, visit => {
-			if (skip > 0) {
-				skip--;
-				return;
-			}
+		const times = _.chain(visits).times(i => _.random(0, SECONDS_PER_DAY - 1)).uniq().sortBy(v => v).value();
+		for (let i = 0; i < visits; i++) {
 			const currentVenue = trajectory[trajectory.length - 1];
 			outputFile.write([
 				userid,
 				currentVenue.venueid,
-				moment(config.interval[0]).add(day, 'days').add(times[visit], 'seconds').format('DD/MM/YYYY HH:mm:ss'),
+				moment(config.interval[0]).add(day, 'days').add(times[i], 'seconds').format('DD/MM/YYYY HH:mm:ss'),
 				tpos++
 			].join(';') + '\n');
 			// don't calculate next venue if last in trajectory
-			if (visit === visits - 1) {
-				return;
+			if (i === visits - 1) {
+				break;
 			}
-			for (var j = visit + 1; j < visits; j++) {
-				skip++;
-				const deltaT = (times[j] - times[visit]) / 3600; // in hours
+			for (let j = i + 1; j < visits; j++) {
+				const deltaT = (times[j] - times[i]) / 3600; // in hours
 				const nextVenue = _.shuffle(venues).find(v => {
 					const d = distance(currentVenue.latitude, currentVenue.longitude, v.latitude, v.longitude, 'K');
 					if (d > config.speed * deltaT) return false;
@@ -176,10 +170,11 @@ _.times(config.users, userid => {
 				});
 				if (nextVenue) {
 					trajectory.push(nextVenue);
-					return;
+					break;
 				}
+				i++;
 			}
-		});
+		}
 	});
 	bar.update(userid);
 });
