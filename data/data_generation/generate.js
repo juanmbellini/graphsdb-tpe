@@ -134,7 +134,7 @@ function distance(lat1, lon1, lat2, lon2, unit) {
 
 const SECONDS_PER_DAY = 1440 * 60;
 
-const venues = require('./venues.json');
+
 
 const outputFile = fs.createWriteStream(config.output);
 outputFile.write(['userid', 'venueid', 'utctimestamp', 'tpos'].join(';') + '\n');
@@ -142,39 +142,45 @@ outputFile.write(['userid', 'venueid', 'utctimestamp', 'tpos'].join(';') + '\n')
 const bar = new cliProgress.Bar({}, cliProgress.Presets.shades_classic);
 bar.start(config.users, 0);
 
+const venues = require('./venues.json');
+
 _.times(config.users, userid => {
 	let tpos = 0;
 	_.times(config.interval[1].diff(config.interval[0], 'days'), day => {
-		const initialVenue = venues[_.random(0, venues.length - 1)];
-		const trajectory = [initialVenue];
 		const visits = _.random(config.visits[0], config.visits[1]);
 		const times = _.chain(visits).times(i => _.random(0, SECONDS_PER_DAY - 1)).uniq().sortBy(v => v).value();
-		for (let i = 0; i < visits; i++) {
-			const currentVenue = trajectory[trajectory.length - 1];
+		const initialVenue = venues[_.random(0, venues.length - 1)];
+		const trajectory = new Array(times.length);
+		trajectory[0] = initialVenue;
+
+		times.slice(1).reduce((trajectory, timeOfVisit, i) => {
+			const currentVenue = _.findLast(trajectory, Boolean);
+
+			const deltaT = (timeOfVisit - times[i - 1]) / 3600;
+			const startIndex = _.random(0, venues.length - 1);
+			// const possibleVenues = _.filter(venues, v => currentVenue != v && v.venueid != currentVenue.venueid);
+			const predicate = v => {
+				if (currentVenue == v || v.venueid == currentVenue.venueid) return false;
+				const d = distance(currentVenue.latitude, currentVenue.longitude, v.latitude, v.longitude, 'K');
+				if (d > config.speed * deltaT) return false;
+				return true;
+			};
+			const firstSliceVenue = _.find(venues, predicate, startIndex);
+			const secondSliceVenue = firstSliceVenue || _.find(venues, predicate);
+			const nextVenue = firstSliceVenue || secondSliceVenue;
+
+			trajectory[i + 1] = nextVenue;
+			return trajectory;
+		}, trajectory);
+
+		trajectory.filter(Boolean).forEach((venue, i) => {
 			outputFile.write([
 				userid,
-				currentVenue.venueid,
+				venue.venueid,
 				moment(config.interval[0]).add(day, 'days').add(times[i], 'seconds').format('DD/MM/YYYY HH:mm:ss'),
 				tpos++
 			].join(';') + '\n');
-			// don't calculate next venue if last in trajectory
-			if (i === visits - 1) {
-				break;
-			}
-			for (let j = i + 1; j < visits; j++) {
-				const deltaT = (times[j] - times[i]) / 3600; // in hours
-				const nextVenue = _.shuffle(venues).find(v => {
-					const d = distance(currentVenue.latitude, currentVenue.longitude, v.latitude, v.longitude, 'K');
-					if (d > config.speed * deltaT) return false;
-					return v.venueid !== currentVenue.venueid;
-				});
-				if (nextVenue) {
-					trajectory.push(nextVenue);
-					break;
-				}
-				i++;
-			}
-		}
+		});
 	});
 	bar.update(userid);
 });

@@ -17,3 +17,5 @@ lineReader.on('line', function (line) {
 	vid = venueid;
 	i++;
 });
+
+process.exit(0);

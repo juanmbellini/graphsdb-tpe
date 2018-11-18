@@ -9,5 +9,5 @@
 		15
 	],
 	"speed": 10,
-	"output": "output-10000-100.csv"
+	"output": "trajectories_ls.csv"
 }
