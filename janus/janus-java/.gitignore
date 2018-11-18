@@ -22,8 +22,3 @@ release.properties
 dependency-reduced-pom.xml
 buildNumber.properties
 .mvn/timing.properties
-
-##################
-# Flyway stuff
-##################
-flyway.conf
