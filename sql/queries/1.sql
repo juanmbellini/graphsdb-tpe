@@ -1,9 +1,14 @@
-WITH RECURSIVE trajectory(userid, pos, path, depth, cattype) AS 
-(
+WITH RECURSIVE trajectory(
+	userid,
+	pos,
+-- 	path,
+	depth,
+	cattype
+) AS (
    SELECT
       t.userid,
       t.tpos,
-      t.tpos || '',
+--       t.tpos || '',
       1,
       c.cattype 
    FROM
@@ -15,7 +20,7 @@ WITH RECURSIVE trajectory(userid, pos, path, depth, cattype) AS
       SELECT
          t.userid,
          t.tpos,
-         tt.path || ',' || t.tpos,
+--          tt.path || ',' || t.tpos,
          tt.depth + 1,
          tt.cattype || ',' || c.cattype 
       FROM
@@ -30,7 +35,7 @@ WITH RECURSIVE trajectory(userid, pos, path, depth, cattype) AS
 )
 SELECT
    userid,
-   path 
+   pos - depth + 1 as start_pos
 FROM
    trajectory 
 WHERE
