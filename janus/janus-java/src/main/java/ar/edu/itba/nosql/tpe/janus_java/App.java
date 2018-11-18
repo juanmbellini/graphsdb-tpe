@@ -15,7 +15,7 @@ public class App {
      *
      * @param args Program arguments.
      */
-    public static void main(String[] args) {
+    public static void main(final String... args) {
         final double before = System.currentTimeMillis();
         final String configFile = "/Users/jbellini/Dropbox/ITBA/Electivas/NoSQL/TPE/janus/provided_data.properties";
         final JanusGraph graph = JanusGraphFactory.open(configFile);
