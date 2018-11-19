@@ -21,32 +21,31 @@ public class App {
      * @param args Program arguments.
      */
     public static void main(final String... args) {
-        final String configFile = "/Users/jbellini/Dropbox/ITBA/Electivas/NoSQL/TPE/janus/dataset-5-100.properties";
+        final String configFile = "/Users/jbellini/Projects/graphsdb-tpe/janus/config_files/dataset-1000-100.properties";
         try (final JanusGraph graph = JanusGraphFactory.open(configFile)) {
-
-            final GraphTraversal<Vertex, ?> result = graph.traversal().V()
-                    .match(
-                            buildMatchForCategory("home", "Home"),
-                            buildMatchForCategory("station", "Station"),
-                            buildMatchForCategory("airport", "Airport"),
-                            __.as("home")
-                                    .out("trajStep")
-                                    .as("station")
-                                    .out("trajStep")
-                                    .as("airport")
-
-                    )
-                    .select("home", "station", "airport")
-                    .by(__.out("isVenue").out("hasCategory").out("subCategoryOf").properties("cattype"));
-
-
-            while (result.hasNext()) {
-                System.out.println(result.next());
-            }
-
+            final GraphTraversal<Vertex, ?> result = query1(graph);
+            result.forEachRemaining(System.out::println);
         } catch (Throwable e) {
             LOGGER.error("An exception was thrown", e);
         }
+    }
+
+    /**
+     * The first query.
+     *
+     * @param graph The graph to be queried.
+     * @return A {@link GraphTraversal} with the results.
+     */
+    private static GraphTraversal<Vertex, ?> query1(final JanusGraph graph) {
+        return graph.traversal().V()
+                .match(
+                        buildMatchForCategory("home", "Home"),
+                        buildMatchForCategory("station", "Station"),
+                        buildMatchForCategory("airport", "Airport"),
+                        __.as("home").out("trajStep").as("station").out("trajStep").as("airport")
+
+                )
+                .select("home", "station", "airport");
     }
 
     /**
