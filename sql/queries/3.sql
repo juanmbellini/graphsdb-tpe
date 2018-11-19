@@ -4,7 +4,6 @@ WITH RECURSIVE trajectory(
 	start,
 	src,
 	dst,
---	path,
 	depth
 ) AS 
 (
@@ -14,10 +13,9 @@ WITH RECURSIVE trajectory(
       t.utctimestamp as start,
       t.venueid as src,
       t.venueid as dst,
---      t.tpos || '',
       1
    FROM
-      trajectories_ss t 
+      trajectories_ll t 
       INNER JOIN
          categories c 
          ON c.venueid = t.venueid 
@@ -28,10 +26,9 @@ WITH RECURSIVE trajectory(
          tt.start as start,
          tt.src as src,
          t.venueid as dst,
---         tt.path || ',' || t.tpos,
          tt.depth + 1
       FROM
-         trajectories_ss t,
+         trajectories_ll t,
          trajectory tt,
          categories c 
       WHERE
