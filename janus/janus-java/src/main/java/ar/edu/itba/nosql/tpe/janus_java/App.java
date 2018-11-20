@@ -29,7 +29,7 @@ public class App {
     private final static String CATEGORY_LABEL_VALUE = "Category";
 
     private final static String USER_ID_PROPERTY_KEY = "userid";
-    private final static String UPC_TIMESTAMP_PROPERTY_KEY = "utctimestamp";
+    private final static String UTC_TIMESTAMP_PROPERTY_KEY = "utctimestamp";
     private final static String TPOS_PROPERTY_KEY = "tpos";
     private final static String VENUE_ID_PROPERTY_KEY = "venueid";
     private final static String LATITUDE_PROPERTY_KEY = "latitude";
@@ -50,6 +50,9 @@ public class App {
     public static void main(final String... args) {
         final String configFile = "/Users/jbellini/Projects/graphsdb-tpe/janus/config_files/dataset-1000-100.properties";
         try (final JanusGraph graph = JanusGraphFactory.open(configFile)) {
+            // createSchema(graph);
+            // loadProvidedData(graph, "./tpgrafo.csv", false);
+            // loadSyntheticData(graph, "./output-5-100.csv");
             final GraphTraversal<Vertex, ?> result = query2(graph);
             result.forEachRemaining(System.out::println);
         } catch (Throwable e) {
@@ -159,7 +162,7 @@ public class App {
                 .cardinality(Cardinality.SINGLE)
                 .make();
         management
-                .makePropertyKey(UPC_TIMESTAMP_PROPERTY_KEY)
+                .makePropertyKey(UTC_TIMESTAMP_PROPERTY_KEY)
                 .dataType(Date.class)
                 .cardinality(Cardinality.SINGLE)
                 .make();
@@ -237,6 +240,13 @@ public class App {
         management.commit();
     }
 
+    /**
+     * Loads the provided data (this includes venues, subcategories and categories).
+     *
+     * @param graph        The graph to which data must be added.
+     * @param dataFilePath The path to the file with the data.
+     * @param loadStops    Flag indicating whether stops should be loaded also.
+     */
     private static void loadProvidedData(final JanusGraph graph,
                                          final String dataFilePath, final boolean loadStops) {
         final String csvHeader = "userid|latitude|longitude|utctimestamp|venueid|venuecategory|cattype";
@@ -256,10 +266,6 @@ public class App {
                             final String cattype = data[6];
 
                             // First, get the category vertex (create it if not exists)
-                            final Iterator<Vertex> categoryVertexIterator = graph.traversal().V()
-                                    .hasLabel(CATEGORY_LABEL_VALUE)
-                                    .has(CATTYPE_PROPERTY_KEY, cattype);
-
                             final Vertex categoryVertex = Optional
                                     .of(graph.traversal().V()
                                             .hasLabel(CATEGORY_LABEL_VALUE)
@@ -282,6 +288,7 @@ public class App {
                                     .orElseGet(() -> {
                                         final Vertex vertex = graph.addVertex(T.label, SUBCATEGORY_LABEL_VALUE);
                                         vertex.property(VENUE_CATEGORY_PROPERTY_KEY, venuecategory);
+                                        vertex.addEdge(SUBCATEGORY_EDGE_LABEL, categoryVertex);
                                         return vertex;
                                     });
 
@@ -307,7 +314,7 @@ public class App {
                                 // We also assume that the CSV is not ordered
                                 final Vertex stopVertex = graph.addVertex(T.label, STOP_LABEL_VALUE);
                                 stopVertex.property(USER_ID_PROPERTY_KEY, userid);
-                                stopVertex.property(UPC_TIMESTAMP_PROPERTY_KEY, utctimestamp);
+                                stopVertex.property(UTC_TIMESTAMP_PROPERTY_KEY, utctimestamp);
                                 stopVertex.addEdge(IS_VENUE_EDGE_LABEL, venuesVertex);
                             }
 
@@ -325,7 +332,7 @@ public class App {
             if (loadStops) {
                 final Map<?, ?> map = graph.traversal().V()
                         .hasLabel(STOP_LABEL_VALUE)
-                        .order().by(UPC_TIMESTAMP_PROPERTY_KEY)
+                        .order().by(UTC_TIMESTAMP_PROPERTY_KEY)
                         .group().by(USER_ID_PROPERTY_KEY)
                         .next(); // Map<Long, ArrayList<Vertex>>
 
@@ -344,6 +351,68 @@ public class App {
                 }
                 graph.tx().commit();
             }
+        } catch (final IOException e) {
+            throw new UncheckedIOException("IOException", e);
+        }
+    }
+
+    /**
+     * Loads synthetic data into the given {@code graph}.
+     *
+     * @param graph        The graph to which data must be added.
+     * @param dataFilePath The path to the file with the data.
+     */
+    private static void loadSyntheticData(final JanusGraph graph, final String dataFilePath) {
+        final String csvHeader = "userid;venueid;utctimestamp;tpos";
+        final SimpleDateFormat dateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        final Map<Long, List<Vertex>> vertices = new HashMap<>();
+        try {
+            Files.lines(Paths.get(dataFilePath))
+                    .filter(line -> !line.equals(csvHeader))
+                    .map(line -> line.split(";"))
+                    .forEach(data -> {
+                        try {
+                            // Initialize variables (to avoid accessing by index, which is less readable)
+                            final Long userId = Long.parseLong(data[0]);
+                            final String venueid = data[1];
+                            final Date utctimestamp = dateParser.parse(data[2]);
+                            final int tpos = Integer.parseInt(data[3]);
+
+                            // Then, add the venue (create it if not exists)
+                            final Vertex venuesVertex = Optional
+                                    .of(graph.traversal().V()
+                                            .hasLabel(VENUE_LABEL_VALUE)
+                                            .has(VENUE_ID_PROPERTY_KEY, venueid))
+                                    .filter(Iterator::hasNext)
+                                    .map(Iterator::next)
+                                    .orElseThrow(() -> new NoSuchElementException("No Venue with the given id"));
+
+                            // When generating synthetic data, rows are ordered by userid and by tpos
+                            final Vertex stopVertex = graph.addVertex(T.label, STOP_LABEL_VALUE);
+
+                            stopVertex.property(USER_ID_PROPERTY_KEY, userId);
+                            stopVertex.property(UTC_TIMESTAMP_PROPERTY_KEY, utctimestamp);
+                            stopVertex.property(TPOS_PROPERTY_KEY, tpos);
+                            stopVertex.addEdge(IS_VENUE_EDGE_LABEL, venuesVertex);
+
+                            final List<Vertex> list = vertices.getOrDefault(userId, new LinkedList<>());
+                            list.add(stopVertex);
+                            vertices.put(userId, list);
+                        } catch (final Throwable e) {
+                            throw new RuntimeException("Could not parse file", e);
+                        }
+                    });
+
+            vertices.values()
+                    .forEach(list -> {
+                        Vertex prevVertex = list.remove(0);
+                        while (!list.isEmpty()) {
+                            final Vertex vertex = list.remove(0);
+                            prevVertex.addEdge(TRAJ_STEP_EDGE_LABEL, prevVertex);
+                            prevVertex = vertex;
+                        }
+                    });
+            graph.tx().commit();
         } catch (final IOException e) {
             throw new UncheckedIOException("IOException", e);
         }
