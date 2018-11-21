@@ -122,3 +122,11 @@ ALTER TABLE categories ADD PRIMARY KEY(venueid);
 CREATE INDEX xx_user_ix ON trajectories_xx(userid);
 ALTER TABLE trajectories_xx ADD CONSTRAINT xx_venue FOREIGN KEY(venueid) REFERENCES categories;
 ```
+
+
+## Authors
+
+* [Eric Horvat](https://github.com/EricHorvat)
+* [Martin Goffan](https://github.com/mgoffan)
+* [Juan Bellini](https://github.com/juanmbellini)
+* [Daniel Lobo](https://github.com/lobo)
