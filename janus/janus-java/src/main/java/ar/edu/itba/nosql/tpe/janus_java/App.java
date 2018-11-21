@@ -1,5 +1,6 @@
 package ar.edu.itba.nosql.tpe.janus_java;
 
+import org.apache.tinkerpop.gremlin.process.traversal.P;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__;
 import org.apache.tinkerpop.gremlin.structure.T;
@@ -13,6 +14,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -54,12 +56,13 @@ public class App {
             // loadProvidedData(graph, "./tpgrafo.csv", false);
             // loadSyntheticData(graph, "./output-5-100.csv");
 
-            final GraphTraversal<Vertex, ?> result = query1(graph);
-            result.forEachRemaining(System.out::println);
+            final GraphTraversal<Vertex, ?> result = query2(graph);
+            result.toStream().forEach(System.out::println);
         } catch (Throwable e) {
             LOGGER.error("An exception was thrown", e);
         }
     }
+
 
     /**
      * The first query.
@@ -100,8 +103,19 @@ public class App {
 
     private static GraphTraversal<Vertex, ?> query2(final JanusGraph graph) {
         final String homeStepVariable = "home";
-//        final String airportStepVariable = "airport";
+        final String airportStepVariable = "airport";
+        final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+
+        //noinspection unchecked
         return graph.traversal().V()
+                .hasLabel(CATEGORY_LABEL_VALUE)
+                .has(CATTYPE_PROPERTY_KEY, "Airport")
+                .in(SUBCATEGORY_EDGE_LABEL)
+                .in(HAS_CATEGORY_EDGE_LABEL)
+                .in(IS_VENUE_EDGE_LABEL)
+                .as(airportStepVariable)
+
+                .V()
                 .hasLabel(CATEGORY_LABEL_VALUE)
                 .has(CATTYPE_PROPERTY_KEY, "Home")
                 .in(SUBCATEGORY_EDGE_LABEL)
@@ -109,23 +123,25 @@ public class App {
                 .in(IS_VENUE_EDGE_LABEL)
                 .as(homeStepVariable)
 
-//                .hasLabel(STOP_LABEL_VALUE)
-//                .match(
-//                        buildMatchForCategory(homeStepVariable, "Home"),
-//                        buildMatchForCategory(airportStepVariable, "Airport")
-//                )
-////                .as(homeStepVariable)
-//                .select(homeStepVariable)
-//                .repeat(__.out(TRAJ_STEP_EDGE_LABEL))
+                .filter(__.select(homeStepVariable, airportStepVariable)
+                        .where(homeStepVariable, P.test((o1, o2) -> {
+                            final Vertex v1 = (Vertex) o1;
+                            final Vertex v2 = (Vertex) o2;
+                            final Long id1 = (Long) v1.values(USER_ID_PROPERTY_KEY).next();
+                            final Long id2 = (Long) v2.values(USER_ID_PROPERTY_KEY).next();
+                            final Date d1 = (Date) v1.values(UTC_TIMESTAMP_PROPERTY_KEY).next();
+                            final Date d2 = (Date) v2.values(UTC_TIMESTAMP_PROPERTY_KEY).next();
+                            final Integer tpos1 = (Integer) v1.values(TPOS_PROPERTY_KEY).next();
+                            final Integer tpos2 = (Integer) v2.values(TPOS_PROPERTY_KEY).next();
 
+                            final boolean userIds = id1.equals(id2);
+                            final boolean dates = dateFormat.format(d1).equals(dateFormat.format(d2));
+                            final boolean tpos = tpos1 < tpos2;
 
-                .where(buildCategoryPredicate("Home")) // Get only Homes
-                .repeat(__.out(TRAJ_STEP_EDGE_LABEL).simplePath()).until(buildCategoryPredicate("Airport"))
-                .path()
-                .by(__.out(IS_VENUE_EDGE_LABEL).out(HAS_CATEGORY_EDGE_LABEL).out(SUBCATEGORY_EDGE_LABEL).values("cattype"))
-                ;
-
-
+                            return userIds && dates && tpos;
+                        }, airportStepVariable))
+                )
+                .valueMap();
     }
 
     /**
@@ -375,7 +391,7 @@ public class App {
      */
     private static void loadSyntheticData(final JanusGraph graph, final String dataFilePath) {
         final String csvHeader = "userid;venueid;utctimestamp;tpos";
-        final SimpleDateFormat dateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        final SimpleDateFormat dateParser = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
         final Map<Long, List<Vertex>> vertices = new HashMap<>();
         try {
             Files.lines(Paths.get(dataFilePath))
