@@ -99,10 +99,17 @@ public class App {
     }
 
     private static GraphTraversal<Vertex, ?> query2(final JanusGraph graph) {
-//        final String homeStepVariable = "home";
+        final String homeStepVariable = "home";
 //        final String airportStepVariable = "airport";
         return graph.traversal().V()
-                .hasLabel(STOP_LABEL_VALUE)
+                .hasLabel(CATEGORY_LABEL_VALUE)
+                .has(CATTYPE_PROPERTY_KEY, "Home")
+                .in(SUBCATEGORY_EDGE_LABEL)
+                .in(HAS_CATEGORY_EDGE_LABEL)
+                .in(IS_VENUE_EDGE_LABEL)
+                .as(homeStepVariable)
+
+//                .hasLabel(STOP_LABEL_VALUE)
 //                .match(
 //                        buildMatchForCategory(homeStepVariable, "Home"),
 //                        buildMatchForCategory(airportStepVariable, "Airport")
@@ -237,7 +244,7 @@ public class App {
         // Edges
         management.makeEdgeLabel(IS_VENUE_EDGE_LABEL).multiplicity(Multiplicity.MANY2ONE).make();
         management.makeEdgeLabel(HAS_CATEGORY_EDGE_LABEL).multiplicity(Multiplicity.MANY2ONE).make();
-        management.makeEdgeLabel(SUBCATEGORY_LABEL_VALUE).multiplicity(Multiplicity.MANY2ONE).make();
+        management.makeEdgeLabel(SUBCATEGORY_EDGE_LABEL).multiplicity(Multiplicity.MANY2ONE).make();
         management.makeEdgeLabel(TRAJ_STEP_EDGE_LABEL).multiplicity(Multiplicity.ONE2ONE).make();
 
         // Commit
