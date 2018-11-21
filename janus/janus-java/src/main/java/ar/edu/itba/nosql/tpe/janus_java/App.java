@@ -153,25 +153,6 @@ public class App {
         final String dst = "dst";
         final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
-
-//        return graph.traversal().V()
-//                .hasLabel(STOP_LABEL_VALUE)
-//                .group("a")
-//                .by(USER_ID_PROPERTY_KEY)
-
-//                .group("b")
-//                .by(((Function<Vertex, Date>) v -> v.value(UTC_TIMESTAMP_PROPERTY_KEY)).andThen(dateFormat::format))
-//                .groupCount("c")
-//                .by(__.out(IS_VENUE_EDGE_LABEL).map(v -> v.get().value(VENUE_ID_PROPERTY_KEY)))
-//                .as("d")
-////                .group("c")
-//                .cap("c")
-
-//                .valueMap()
-                ;
-
-//                .by(__.out(IS_VENUE_EDGE_LABEL).values(VENUE_ID_PROPERTY_KEY))
-
         //noinspection unchecked
         return graph.traversal().V()
                 .hasLabel(STOP_LABEL_VALUE)
@@ -205,8 +186,7 @@ public class App {
                             return userIds && dates && tpos && venues;
                         }, dst))
                 )
-                .count()
-                ;
+                .valueMap();
     }
 
     private static GraphTraversal<Vertex, ?> query4(final JanusGraph graph) {
