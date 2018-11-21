@@ -53,7 +53,8 @@ public class App {
             // createSchema(graph);
             // loadProvidedData(graph, "./tpgrafo.csv", false);
             // loadSyntheticData(graph, "./output-5-100.csv");
-            final GraphTraversal<Vertex, ?> result = query2(graph);
+
+            final GraphTraversal<Vertex, ?> result = query1(graph);
             result.forEachRemaining(System.out::println);
         } catch (Throwable e) {
             LOGGER.error("An exception was thrown", e);
@@ -71,27 +72,30 @@ public class App {
         final String stationStepVariable = "station";
         final String airportStepVariable = "airport";
         return graph.traversal().V()
-                .hasLabel(STOP_LABEL_VALUE)
-                .match(
-                        buildMatchForCategory(homeStepVariable, "Home"),
-                        buildMatchForCategory(stationStepVariable, "Station"),
-                        buildMatchForCategory(airportStepVariable, "Airport"),
-                        __.as(homeStepVariable)
-                                .out(TRAJ_STEP_EDGE_LABEL)
-                                .as(stationStepVariable)
-                                .out(TRAJ_STEP_EDGE_LABEL)
-                                .as(airportStepVariable)
-
-                )
+                .hasLabel(CATEGORY_LABEL_VALUE)
+                .has(CATTYPE_PROPERTY_KEY, "Home")
+                .in(SUBCATEGORY_EDGE_LABEL)
+                .in(HAS_CATEGORY_EDGE_LABEL)
+                .in(IS_VENUE_EDGE_LABEL)
+                .as(homeStepVariable)
+                .out(TRAJ_STEP_EDGE_LABEL)
+                .filter(__
+                        .out(IS_VENUE_EDGE_LABEL)
+                        .out(HAS_CATEGORY_EDGE_LABEL)
+                        .out(SUBCATEGORY_EDGE_LABEL)
+                        .has(CATTYPE_PROPERTY_KEY, "Station"))
+                .out(TRAJ_STEP_EDGE_LABEL)
+                .filter(__
+                        .out(IS_VENUE_EDGE_LABEL)
+                        .out(HAS_CATEGORY_EDGE_LABEL)
+                        .out(SUBCATEGORY_EDGE_LABEL)
+                        .has(CATTYPE_PROPERTY_KEY, "Airport"))
                 .select(homeStepVariable)
                 .project(USER_ID_PROPERTY_KEY, homeStepVariable, stationStepVariable, airportStepVariable)
                 .by(USER_ID_PROPERTY_KEY)
                 .by(TPOS_PROPERTY_KEY)
                 .by(__.out(TRAJ_STEP_EDGE_LABEL).values(TPOS_PROPERTY_KEY))
-                .by(__.out(TRAJ_STEP_EDGE_LABEL).out(TRAJ_STEP_EDGE_LABEL).values(TPOS_PROPERTY_KEY))
-                // TODO: format as follow: {userid, [tpos, ...]}
-                ;
-
+                .by(__.out(TRAJ_STEP_EDGE_LABEL).out(TRAJ_STEP_EDGE_LABEL).values(TPOS_PROPERTY_KEY));
     }
 
     private static GraphTraversal<Vertex, ?> query2(final JanusGraph graph) {
