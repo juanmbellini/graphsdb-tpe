@@ -3,6 +3,7 @@ package ar.edu.itba.nosql.tpe.janus_java;
 import org.apache.tinkerpop.gremlin.process.traversal.P;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__;
+import org.apache.tinkerpop.gremlin.structure.Direction;
 import org.apache.tinkerpop.gremlin.structure.T;
 import org.apache.tinkerpop.gremlin.structure.Vertex;
 import org.janusgraph.core.*;
@@ -17,6 +18,7 @@ import java.nio.file.Paths;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.function.Function;
 
 /**
  * Main class.
@@ -56,7 +58,7 @@ public class App {
             // loadProvidedData(graph, "./tpgrafo.csv", false);
             // loadSyntheticData(graph, "./output-5-100.csv");
 
-            final GraphTraversal<Vertex, ?> result = query2(graph);
+            final GraphTraversal<Vertex, ?> result = query3(graph);
             result.toStream().forEach(System.out::println);
         } catch (Throwable e) {
             LOGGER.error("An exception was thrown", e);
@@ -106,6 +108,7 @@ public class App {
         final String airportStepVariable = "airport";
         final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
+
         //noinspection unchecked
         return graph.traversal().V()
                 .hasLabel(CATEGORY_LABEL_VALUE)
@@ -127,12 +130,13 @@ public class App {
                         .where(homeStepVariable, P.test((o1, o2) -> {
                             final Vertex v1 = (Vertex) o1;
                             final Vertex v2 = (Vertex) o2;
-                            final Long id1 = (Long) v1.values(USER_ID_PROPERTY_KEY).next();
-                            final Long id2 = (Long) v2.values(USER_ID_PROPERTY_KEY).next();
-                            final Date d1 = (Date) v1.values(UTC_TIMESTAMP_PROPERTY_KEY).next();
-                            final Date d2 = (Date) v2.values(UTC_TIMESTAMP_PROPERTY_KEY).next();
-                            final Integer tpos1 = (Integer) v1.values(TPOS_PROPERTY_KEY).next();
-                            final Integer tpos2 = (Integer) v2.values(TPOS_PROPERTY_KEY).next();
+
+                            final Long id1 = v1.value(USER_ID_PROPERTY_KEY);
+                            final Long id2 = v2.value(USER_ID_PROPERTY_KEY);
+                            final Date d1 = v1.value(UTC_TIMESTAMP_PROPERTY_KEY);
+                            final Date d2 = v2.value(UTC_TIMESTAMP_PROPERTY_KEY);
+                            final Integer tpos1 = v1.value(TPOS_PROPERTY_KEY);
+                            final Integer tpos2 = v2.value(TPOS_PROPERTY_KEY);
 
                             final boolean userIds = id1.equals(id2);
                             final boolean dates = dateFormat.format(d1).equals(dateFormat.format(d2));
@@ -142,6 +146,79 @@ public class App {
                         }, airportStepVariable))
                 )
                 .valueMap();
+    }
+
+    private static GraphTraversal<Vertex, ?> query3(final JanusGraph graph) {
+        final String src = "src";
+        final String dst = "dst";
+        final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+
+
+//        return graph.traversal().V()
+//                .hasLabel(STOP_LABEL_VALUE)
+//                .group("a")
+//                .by(USER_ID_PROPERTY_KEY)
+
+//                .group("b")
+//                .by(((Function<Vertex, Date>) v -> v.value(UTC_TIMESTAMP_PROPERTY_KEY)).andThen(dateFormat::format))
+//                .groupCount("c")
+//                .by(__.out(IS_VENUE_EDGE_LABEL).map(v -> v.get().value(VENUE_ID_PROPERTY_KEY)))
+//                .as("d")
+////                .group("c")
+//                .cap("c")
+
+//                .valueMap()
+                ;
+
+//                .by(__.out(IS_VENUE_EDGE_LABEL).values(VENUE_ID_PROPERTY_KEY))
+
+        //noinspection unchecked
+        return graph.traversal().V()
+                .hasLabel(STOP_LABEL_VALUE)
+                .as(src)
+                .V()
+                .hasLabel(STOP_LABEL_VALUE)
+                .as(dst)
+                .filter(__.select(src, dst)
+                        .where(src, P.test((o1, o2) -> {
+                            final Vertex v1 = (Vertex) o1;
+                            final Vertex v2 = (Vertex) o2;
+                            final Long id1 = (Long) v1.values(USER_ID_PROPERTY_KEY).next();
+                            final Long id2 = (Long) v2.values(USER_ID_PROPERTY_KEY).next();
+                            final Date d1 = (Date) v1.values(UTC_TIMESTAMP_PROPERTY_KEY).next();
+                            final Date d2 = (Date) v2.values(UTC_TIMESTAMP_PROPERTY_KEY).next();
+                            final Integer tpos1 = (Integer) v1.values(TPOS_PROPERTY_KEY).next();
+                            final Integer tpos2 = (Integer) v2.values(TPOS_PROPERTY_KEY).next();
+
+                            final Vertex venueVertex1 = v1.edges(Direction.OUT, IS_VENUE_EDGE_LABEL).next().inVertex();
+                            final Vertex venueVertex2 = v2.edges(Direction.OUT, IS_VENUE_EDGE_LABEL).next().inVertex();
+
+                            final String venueId1 = (String) venueVertex1.values(VENUE_ID_PROPERTY_KEY).next();
+                            final String venueId2 = (String) venueVertex2.values(VENUE_ID_PROPERTY_KEY).next();
+
+                            final boolean userIds = id1.equals(id2);
+                            final boolean dates = dateFormat.format(d1).equals(dateFormat.format(d2));
+                            final boolean tpos = tpos1 < tpos2;
+                            final boolean venues = venueId1.equals(venueId2);
+
+
+                            return userIds && dates && tpos && venues;
+                        }, dst))
+                )
+                .count()
+                ;
+    }
+
+    private static GraphTraversal<Vertex, ?> query4(final JanusGraph graph) {
+//        final String src = "src";
+//        final String dst = "dst";
+//        return graph.traversal().V()
+//                .hasLabel(STOP_LABEL_VALUE)
+//                .as(src)
+//                .V()
+//                .hasLabel(STOP_LABEL_VALUE)
+//                .as(dst);
+        return graph.traversal().V();
     }
 
     /**
